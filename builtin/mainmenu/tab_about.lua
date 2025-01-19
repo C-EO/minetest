@@ -1,4 +1,4 @@
---Minetest
+--Luanti
 --Copyright (C) 2013 sapier
 --
 --This program is free software; you can redistribute it and/or modify
@@ -15,101 +15,42 @@
 --with this program; if not, write to the Free Software Foundation, Inc.,
 --51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
--- https://github.com/orgs/minetest/teams/engine/members
-
-local core_developers = {
-	"Perttu Ahola (celeron55) <celeron55@gmail.com> [Project founder]",
-	"sfan5 <sfan5@live.de>",
-	"ShadowNinja <shadowninja@minetest.net>",
-	"Nathanaëlle Courant (Nore/Ekdohibs) <nore@mesecons.net>",
-	"Loic Blot (nerzhul/nrz) <loic.blot@unix-experience.fr>",
-	"Andrew Ward (rubenwardy) <rw@rubenwardy.com>",
-	"Krock/SmallJoker <mk939@ymail.com>",
-	"Lars Hofhansl <larsh@apache.org>",
-	"v-rob <robinsonvincent89@gmail.com>",
-	"Hugues Ross <hugues.ross@gmail.com>",
-	"Dmitry Kostenko (x2048) <codeforsmile@gmail.com>",
-	"Desour",
-}
-
--- currently only https://github.com/orgs/minetest/teams/triagers/members
-
-local core_team = {
-	"Zughy [Issue triager]",
-	"wsor [Issue triager]",
-	"Hugo Locurcio (Calinou) [Issue triager]",
-}
-
--- For updating active/previous contributors, see the script in ./util/gather_git_credits.py
-
-local active_contributors = {
-	"Wuzzy [Features, translations, devtest]",
-	"Lars Müller [Bugfixes and entity features]",
-	"paradust7 [Bugfixes]",
-	"ROllerozxa [Bugfixes, Android]",
-	"srifqi [Android, translations]",
-	"Lexi Hale [Particlespawner animation]",
-	"savilli [Bugfixes]",
-	"fluxionary [Bugfixes]",
-	"Gregor Parzefall [Bugfixes]",
-	"Abdou-31 [Documentation]",
-	"pecksin [Bouncy physics]",
-	"Daroc Alden [Fixes]",
-}
-
-local previous_core_developers = {
-	"BlockMen",
-	"Maciej Kasatkin (RealBadAngel) [RIP]",
-	"Lisa Milne (darkrose) <lisa@ltmnet.com>",
-	"proller",
-	"Ilya Zhuravlev (xyz) <xyz@minetest.net>",
-	"PilzAdam <pilzadam@minetest.net>",
-	"est31 <MTest31@outlook.com>",
-	"kahrl <kahrl@gmx.net>",
-	"Ryan Kwolek (kwolekr) <kwolekr@minetest.net>",
-	"sapier",
-	"Zeno",
-	"Auke Kok (sofar) <sofar@foo-projects.org>",
-	"Aaron Suen <warr1024@gmail.com>",
-	"paramat",
-	"Pierre-Yves Rollo <dev@pyrollo.com>",
-	"hecks",
-	"Jude Melton-Houghton (TurkeyMcMac) [RIP]",
-}
-
-local previous_contributors = {
-	"Nils Dagsson Moskopp (erlehmann) <nils@dieweltistgarnichtso.net> [Minetest logo]",
-	"red-001 <red-001@outlook.ie>",
-	"Giuseppe Bilotta",
-	"numzero",
-	"HybridDog",
-	"ClobberXD",
-	"Dániel Juhász (juhdanad) <juhdanad@gmail.com>",
-	"MirceaKitsune <mirceakitsune@gmail.com>",
-	"Jean-Patrick Guerrero (kilbith)",
-	"MoNTE48",
-	"Constantin Wenger (SpeedProg)",
-	"Ciaran Gultnieks (CiaranG)",
-	"Paul Ouellette (pauloue)",
-	"stujones11",
-	"Rogier <rogier777@gmail.com>",
-	"Gregory Currie (gregorycu)",
-	"JacobF",
-	"Jeija <jeija@mesecons.net>",
-}
 
 local function prepare_credits(dest, source)
 	local string = table.concat(source, "\n") .. "\n"
 
-	local hypertext_escapes = {
-		["\\"] = "\\\\",
-		["<"] = "\\<",
-		[">"] = "\\>",
-	}
-	string = string:gsub("[\\<>]", hypertext_escapes)
+	string = core.hypertext_escape(string)
 	string = string:gsub("%[.-%]", "<gray>%1</gray>")
 
 	table.insert(dest, string)
+end
+
+local function get_credits()
+	local f = assert(io.open(core.get_mainmenu_path() .. "/credits.json"))
+	local json = core.parse_json(f:read("*all"))
+	f:close()
+	return json
+end
+
+local function get_renderer_info()
+	local ret = {}
+
+	-- OpenGL version, stripped to just the important part
+	local s1 = core.get_active_renderer()
+	if s1:sub(1, 7) == "OpenGL " then
+		s1 = s1:sub(8)
+	end
+	local m = s1:match("^[%d.]+")
+	if not m then
+		m = s1:match("^ES [%d.]+")
+	end
+	ret[#ret+1] = m or s1
+	-- video driver
+	ret[#ret+1] = core.get_active_driver():lower()
+	-- irrlicht device
+	ret[#ret+1] = core.get_active_irrlicht_device():upper()
+
+	return table.concat(ret, " / ")
 end
 
 return {
@@ -125,36 +66,32 @@ return {
 			"<tag name=gray color=#aaa>",
 		}
 
+		local credits = get_credits()
+
 		table.insert_all(hypertext, {
-			"<style color=#000>Dedication of the current release</style>\n",
-			"The 5.7.0 release is dedicated to the memory of\n",
-			"Minetest developer Jude Melton-Houghton (TurkeyMcMac)\n",
-			"who died on February 1, 2023.\n",
-			"Our thoughts are with his family and friends.\n",
-			"\n",
 			"<heading>", fgettext_ne("Core Developers"), "</heading>\n",
 		})
-		prepare_credits(hypertext, core_developers)
+		prepare_credits(hypertext, credits.core_developers)
 		table.insert_all(hypertext, {
 			"\n",
 			"<heading>", fgettext_ne("Core Team"), "</heading>\n",
 		})
-		prepare_credits(hypertext, core_team)
+		prepare_credits(hypertext, credits.core_team)
 		table.insert_all(hypertext, {
 			"\n",
 			"<heading>", fgettext_ne("Active Contributors"), "</heading>\n",
 		})
-		prepare_credits(hypertext, active_contributors)
+		prepare_credits(hypertext, credits.contributors)
 		table.insert_all(hypertext, {
 			"\n",
 			"<heading>", fgettext_ne("Previous Core Developers"), "</heading>\n",
 		})
-		prepare_credits(hypertext, previous_core_developers)
+		prepare_credits(hypertext, credits.previous_core_developers)
 		table.insert_all(hypertext, {
 			"\n",
 			"<heading>", fgettext_ne("Previous Contributors"), "</heading>\n",
 		})
-		prepare_credits(hypertext, previous_contributors)
+		prepare_credits(hypertext, credits.previous_contributors)
 
 		hypertext = table.concat(hypertext):sub(1, -2)
 
@@ -162,22 +99,14 @@ return {
 			"style[label_button;border=false]" ..
 			"button[0.1,3.4;5.3,0.5;label_button;" ..
 			core.formspec_escape(version.project .. " " .. version.string) .. "]" ..
-			"button[1.5,4.1;2.5,0.8;homepage;minetest.net]" ..
-			"hypertext[5.5,0.25;9.75,6.6;credits;" .. minetest.formspec_escape(hypertext) .. "]"
+			"button_url[1.5,4.1;2.5,0.8;homepage;luanti.org;https://www.luanti.org/]" ..
+			"hypertext[5.5,0.25;9.75,6.6;credits;" .. core.formspec_escape(hypertext) .. "]"
 
-		-- Render information
-		local active_renderer_info = fgettext("Active renderer:") .. " " ..
-			core.formspec_escape(core.get_active_renderer())
+		local active_renderer_info = fgettext("Active renderer:") .. "\n" ..
+			core.formspec_escape(get_renderer_info())
 		fs = fs .. "style[label_button2;border=false]" ..
-			"button[0.1,6;5.3,0.5;label_button2;" .. active_renderer_info .. "]"..
+			"button[0.1,6;5.3,1;label_button2;" .. active_renderer_info .. "]"..
 			"tooltip[label_button2;" .. active_renderer_info .. "]"
-
-		-- Irrlicht device information
-		local irrlicht_device_info = fgettext("Irrlicht device:") .. " " ..
-			core.formspec_escape(core.get_active_irrlicht_device())
-		fs = fs .. "style[label_button3;border=false]" ..
-			"button[0.1,6.5;5.3,0.5;label_button3;" .. irrlicht_device_info .. "]"..
-			"tooltip[label_button3;" .. irrlicht_device_info .. "]"
 
 		if PLATFORM == "Android" then
 			fs = fs .. "button[0.5,5.1;4.5,0.8;share_debug;" .. fgettext("Share debug log") .. "]"
@@ -192,10 +121,6 @@ return {
 	end,
 
 	cbf_button_handler = function(this, fields, name, tabdata)
-		if fields.homepage then
-			core.open_url("https://www.minetest.net")
-		end
-
 		if fields.share_debug then
 			local path = core.get_user_path() .. DIR_DELIM .. "debug.txt"
 			core.share_file(path)

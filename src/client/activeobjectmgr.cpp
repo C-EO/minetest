@@ -1,21 +1,6 @@
-/*
-Minetest
-Copyright (C) 2010-2018 nerzhul, Loic BLOT <loic.blot@unix-experience.fr>
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation; either version 2.1 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-*/
+// Luanti
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2010-2018 nerzhul, Loic BLOT <loic.blot@unix-experience.fr>
 
 #include <cmath>
 #include <log.h>
@@ -37,20 +22,16 @@ ActiveObjectMgr::~ActiveObjectMgr()
 void ActiveObjectMgr::step(
 		float dtime, const std::function<void(ClientActiveObject *)> &f)
 {
-	g_profiler->avg("ActiveObjectMgr: CAO count [#]", m_active_objects.size());
-
-	// Same as in server activeobjectmgr.
-	std::vector<u16> ids = getAllIds();
-
-	for (u16 id : ids) {
-		auto it = m_active_objects.find(id);
-		if (it == m_active_objects.end())
-			continue; // obj was removed
-		f(it->second.get());
+	size_t count = 0;
+	for (auto &ao_it : m_active_objects.iter()) {
+		if (!ao_it.second)
+			continue;
+		count++;
+		f(ao_it.second.get());
 	}
+	g_profiler->avg("ActiveObjectMgr: CAO count [#]", count);
 }
 
-// clang-format off
 bool ActiveObjectMgr::registerObject(std::unique_ptr<ClientActiveObject> obj)
 {
 	assert(obj); // Pre-condition
@@ -72,7 +53,7 @@ bool ActiveObjectMgr::registerObject(std::unique_ptr<ClientActiveObject> obj)
 	}
 	infostream << "Client::ActiveObjectMgr::registerObject(): "
 			<< "added (id=" << obj->getId() << ")" << std::endl;
-	m_active_objects[obj->getId()] = std::move(obj);
+	m_active_objects.put(obj->getId(), std::move(obj));
 	return true;
 }
 
@@ -80,26 +61,25 @@ void ActiveObjectMgr::removeObject(u16 id)
 {
 	verbosestream << "Client::ActiveObjectMgr::removeObject(): "
 			<< "id=" << id << std::endl;
-	auto it = m_active_objects.find(id);
-	if (it == m_active_objects.end()) {
+
+	std::unique_ptr<ClientActiveObject> obj = m_active_objects.take(id);
+	if (!obj) {
 		infostream << "Client::ActiveObjectMgr::removeObject(): "
 				<< "id=" << id << " not found" << std::endl;
 		return;
 	}
 
-	std::unique_ptr<ClientActiveObject> obj = std::move(it->second);
-	m_active_objects.erase(it);
-
 	obj->removeFromScene(true);
 }
 
-// clang-format on
 void ActiveObjectMgr::getActiveObjects(const v3f &origin, f32 max_d,
 		std::vector<DistanceSortedActiveObject> &dest)
 {
 	f32 max_d2 = max_d * max_d;
-	for (auto &ao_it : m_active_objects) {
+	for (auto &ao_it : m_active_objects.iter()) {
 		ClientActiveObject *obj = ao_it.second.get();
+		if (!obj)
+			continue;
 
 		f32 d2 = (obj->getPosition() - origin).getLengthSQ();
 
@@ -116,10 +96,12 @@ std::vector<DistanceSortedActiveObject> ActiveObjectMgr::getActiveSelectableObje
 	f32 max_d = shootline.getLength();
 	v3f dir = shootline.getVector().normalize();
 
-	for (auto &ao_it : m_active_objects) {
+	for (auto &ao_it : m_active_objects.iter()) {
 		ClientActiveObject *obj = ao_it.second.get();
+		if (!obj)
+			continue;
 
-		aabb3f selection_box;
+		aabb3f selection_box{{0.0f, 0.0f, 0.0f}};
 		if (!obj->getSelectionBox(&selection_box))
 			continue;
 
